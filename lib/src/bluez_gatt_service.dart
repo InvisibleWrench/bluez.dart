@@ -2,6 +2,7 @@ import 'package:bluez/src/bluez_characteristic.dart';
 import 'package:bluez/src/bluez_client.dart';
 import 'package:bluez/src/bluez_object.dart';
 import 'package:bluez/src/bluez_uuid.dart';
+import 'package:dbus/dbus.dart';
 
 /// A GATT service running on a BlueZ device.
 class BlueZGattService {
@@ -10,7 +11,9 @@ class BlueZGattService {
   final BlueZClient _client;
   final BlueZObject _object;
 
-  BlueZGattService(this._client, this._object);
+  List<BlueZGattCharacteristic>? gattCharacteristics;
+
+  BlueZGattService(this._client, this._object, {this.gattCharacteristics});
 
   // TODO(robert-ancell): Includes
 

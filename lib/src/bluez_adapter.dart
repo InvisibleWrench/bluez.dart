@@ -3,6 +3,7 @@ import 'package:bluez/src/bluez_battery.dart';
 import 'package:bluez/src/bluez_client.dart';
 import 'package:bluez/src/bluez_device.dart';
 import 'package:bluez/src/bluez_enums.dart';
+import 'package:bluez/src/bluez_gatt_manager.dart';
 import 'package:bluez/src/bluez_object.dart';
 import 'package:bluez/src/bluez_uuid.dart';
 import 'package:dbus/dbus.dart';
@@ -195,4 +196,11 @@ class BlueZAdapter {
       (_object.getStringArrayProperty(_adapterInterfaceName, 'UUIDs') ?? [])
           .map((value) => BlueZUUID.fromString(value))
           .toList();
+
+  BlueZGATTManager? _gattManager;
+
+  BlueZGATTManager get gattManager {
+    _gattManager ??= BlueZGATTManager(_client, _object);
+    return _gattManager!;
+  }
 }

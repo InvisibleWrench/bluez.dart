@@ -12,4 +12,7 @@ export 'src/bluez_exception.dart';
 export 'src/bluez_gatt_descriptor.dart';
 export 'src/bluez_gatt_service.dart';
 export 'src/bluez_advertisement.dart';
+export 'src/bluez_peripheral_gatt_application.dart';
+export 'src/bluez_peripheral_gatt_service.dart';
+export 'src/bluez_peripheral_gatt_characteristic.dart';
 export 'src/bluez_client.dart' show BlueZClient;

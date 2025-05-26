@@ -17,15 +17,13 @@ class BlueZClient {
   Stream<BlueZAdapter> get adapterAdded => _adapterAddedStreamController.stream;
 
   /// Stream of adapters as they are removed.
-  Stream<BlueZAdapter> get adapterRemoved =>
-      _adapterRemovedStreamController.stream;
+  Stream<BlueZAdapter> get adapterRemoved => _adapterRemovedStreamController.stream;
 
   /// Stream of devices as they are added.
   Stream<BlueZDevice> get deviceAdded => _deviceAddedStreamController.stream;
 
   /// Stream of devices as they are removed.
-  Stream<BlueZDevice> get deviceRemoved =>
-      _deviceRemovedStreamController.stream;
+  Stream<BlueZDevice> get deviceRemoved => _deviceRemovedStreamController.stream;
 
   /// The bus this client is connected to.
   final DBusClient _bus;
@@ -40,14 +38,10 @@ class BlueZClient {
   // Subscription to object manager signals.
   StreamSubscription? _objectManagerSubscription;
 
-  final _adapterAddedStreamController =
-      StreamController<BlueZAdapter>.broadcast();
-  final _adapterRemovedStreamController =
-      StreamController<BlueZAdapter>.broadcast();
-  final _deviceAddedStreamController =
-      StreamController<BlueZDevice>.broadcast();
-  final _deviceRemovedStreamController =
-      StreamController<BlueZDevice>.broadcast();
+  final _adapterAddedStreamController = StreamController<BlueZAdapter>.broadcast();
+  final _adapterRemovedStreamController = StreamController<BlueZAdapter>.broadcast();
+  final _deviceAddedStreamController = StreamController<BlueZDevice>.broadcast();
+  final _deviceRemovedStreamController = StreamController<BlueZDevice>.broadcast();
 
   /// Registered agent.
   BlueZAgentObject? _agent;
@@ -56,8 +50,7 @@ class BlueZClient {
   BlueZClient({DBusClient? bus})
       : _bus = bus ?? DBusClient.system(),
         _closeBus = bus == null {
-    _root = DBusRemoteObjectManager(_bus,
-        name: 'org.bluez', path: DBusObjectPath('/'));
+    _root = DBusRemoteObjectManager(_bus, name: 'org.bluez', path: DBusObjectPath('/'));
   }
 
   /// Connects to the BlueZ daemon.
@@ -75,8 +68,7 @@ class BlueZClient {
         if (object != null) {
           object.updateInterfaces(signal.interfacesAndProperties);
         } else {
-          object = BlueZObject(
-              _bus, signal.changedPath, signal.interfacesAndProperties);
+          object = BlueZObject(_bus, signal.changedPath, signal.interfacesAndProperties);
           _objects[signal.changedPath] = object;
           if (_isAdapter(object)) {
             _adapterAddedStreamController.add(BlueZAdapter(this, object));
@@ -104,8 +96,7 @@ class BlueZClient {
       } else if (signal is DBusPropertiesChangedSignal) {
         var object = _objects[signal.path];
         if (object != null) {
-          object.updateProperties(
-              signal.propertiesInterface, signal.changedProperties);
+          object.updateProperties(signal.propertiesInterface, signal.changedProperties);
         }
       }
     });
@@ -113,8 +104,7 @@ class BlueZClient {
     // Find all the objects exported.
     var objects = await _root.getManagedObjects();
     objects.forEach((objectPath, interfacesAndProperties) {
-      _objects[objectPath] =
-          BlueZObject(_bus, objectPath, interfacesAndProperties);
+      _objects[objectPath] = BlueZObject(_bus, objectPath, interfacesAndProperties);
     });
 
     // Report initial adapters and devices.
@@ -153,9 +143,7 @@ class BlueZClient {
 
   /// Registers an agent handler.
   /// A D-Bus object will be registered on [path], which the user must choose to not collide with any other path on the D-Bus client that was passed in the [BlueZClient] constructor.
-  Future<void> registerAgent(BlueZAgent agent,
-      {DBusObjectPath? path,
-      var capability = BlueZAgentCapability.keyboardDisplay}) async {
+  Future<void> registerAgent(BlueZAgent agent, {DBusObjectPath? path, var capability = BlueZAgentCapability.keyboardDisplay}) async {
     if (_agent != null) {
       throw 'Agent already registered';
     }
@@ -165,8 +153,7 @@ class BlueZClient {
       throw 'Missing /org/bluez object required for agent registration';
     }
 
-    _agent = BlueZAgentObject(
-        this, agent, path ?? DBusObjectPath('/org/bluez/Agent'));
+    _agent = BlueZAgentObject(this, agent, path ?? DBusObjectPath('/org/bluez/Agent'));
     await _bus.registerObject(_agent!);
 
     var capabilityString = {
@@ -178,9 +165,7 @@ class BlueZClient {
         }[capability] ??
         '';
 
-    await object.callMethod('org.bluez.AgentManager1', 'RegisterAgent',
-        [_agent!.path, DBusString(capabilityString)],
-        replySignature: DBusSignature(''));
+    await object.callMethod('org.bluez.AgentManager1', 'RegisterAgent', [_agent!.path, DBusString(capabilityString)], replySignature: DBusSignature(''));
   }
 
   /// Unregisters the agent handler previouly registered with [registerAgent].
@@ -194,9 +179,7 @@ class BlueZClient {
       throw 'Missing /org/bluez object required for agent unregistration';
     }
 
-    await object.callMethod(
-        'org.bluez.AgentManager1', 'UnregisterAgent', [_agent!.path],
-        replySignature: DBusSignature(''));
+    await object.callMethod('org.bluez.AgentManager1', 'UnregisterAgent', [_agent!.path], replySignature: DBusSignature(''));
     _agent = null;
   }
 
@@ -207,9 +190,7 @@ class BlueZClient {
       throw 'Missing /org/bluez object required for agent unregistration';
     }
 
-    await object.callMethod(
-        'org.bluez.AgentManager1', 'RequestDefaultAgent', [_agent!.path],
-        replySignature: DBusSignature(''));
+    await object.callMethod('org.bluez.AgentManager1', 'RequestDefaultAgent', [_agent!.path], replySignature: DBusSignature(''));
   }
 
   /// Terminates all active connections. If a client remains unclosed, the Dart process may not terminate.
@@ -230,14 +211,15 @@ class BlueZClient {
   bool _isAdapter(BlueZObject object) {
     return object.interfaces.containsKey('org.bluez.Adapter1');
   }
+
+  DBusClient get dBusClient => _bus;
 }
 
 /// This extension is for internal use within the plugin and is not part of the public API.
 extension BluezClientInternalExtension on BlueZClient {
   Future<void> registerObject(DBusObject object) => _bus.registerObject(object);
 
-  Future<void> unregisterObject(DBusObject object) =>
-      _bus.unregisterObject(object);
+  Future<void> unregisterObject(DBusObject object) => _bus.unregisterObject(object);
 
   BlueZDevice? getDevice(DBusObjectPath objectPath) {
     var object = _objects[objectPath];
@@ -263,12 +245,10 @@ extension BluezClientInternalExtension on BlueZClient {
     return object.interfaces.containsKey('org.bluez.GattService1');
   }
 
-  List<BlueZGattCharacteristic> getGattCharacteristics(
-      DBusObjectPath parentPath) {
+  List<BlueZGattCharacteristic> getGattCharacteristics(DBusObjectPath parentPath) {
     var characteristics = <BlueZGattCharacteristic>[];
     for (var object in _objects.values) {
-      if (object.path.isInNamespace(parentPath) &&
-          _isGattCharacteristic(object)) {
+      if (object.path.isInNamespace(parentPath) && _isGattCharacteristic(object)) {
         characteristics.add(BlueZGattCharacteristic(this, object));
       }
     }
@@ -292,4 +272,6 @@ extension BluezClientInternalExtension on BlueZClient {
   bool _isGattDescriptor(BlueZObject object) {
     return object.interfaces.containsKey('org.bluez.GattDescriptor1');
   }
+
+
 }

@@ -8,7 +8,7 @@ import 'package:bluez/src/bluez_uuid.dart';
 import 'package:dbus/dbus.dart';
 
 /// A characteristic of a GATT service.
-class BlueZGattCharacteristic {
+class BlueZGattCharacteristic{
   final String _gattCharacteristicInterfaceName =
       'org.bluez.GattCharacteristic1';
 
