@@ -50,9 +50,6 @@ class BlueZGATTManager {
 
   Future<void> registerApplicationWithServices(List<BlueZPeripheralGattServiceDescription> serviceDescriptions,
       {Map<String, DBusValue> options = const {}}) async {
-    print('client ${_client}');
-    print('object ${_object.path}');
-
     DBusObjectPath appPath = _object.path;
 
     // Build service/characteristics tree
