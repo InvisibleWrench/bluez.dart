@@ -16,6 +16,7 @@ class BlueZAdapter {
   final BlueZObject _object;
   BlueZAdvertisingManager? _advertisingManager;
   BlueZBatteryProviderManager? _batteryProviderManager;
+  BlueZGATTManager? _gattManager;
 
   BlueZAdapter(this._client, this._object);
 
@@ -23,6 +24,11 @@ class BlueZAdapter {
   BlueZAdvertisingManager get advertisingManager {
     _advertisingManager ??= BlueZAdvertisingManager(_client, _object);
     return _advertisingManager!;
+  }
+
+  BlueZGATTManager get gattManager {
+    _gattManager ??= BlueZGATTManager(_client, _object);
+    return _gattManager!;
   }
 
   /// Retrive the battery provider manager associated with the adapter.
@@ -196,11 +202,4 @@ class BlueZAdapter {
       (_object.getStringArrayProperty(_adapterInterfaceName, 'UUIDs') ?? [])
           .map((value) => BlueZUUID.fromString(value))
           .toList();
-
-  BlueZGATTManager? _gattManager;
-
-  BlueZGATTManager get gattManager {
-    _gattManager ??= BlueZGATTManager(_client, _object);
-    return _gattManager!;
-  }
 }

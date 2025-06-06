@@ -45,13 +45,13 @@ class BlueZGATTManager {
   BlueZPeripheralGattApplication? application;
   final Map<String, BlueZPeripheralGattCharacteristic> _characteristics = {};
 
-  StreamController<BlueZGattData> _dataReceivedCtrl = StreamController.broadcast();
+  final StreamController<BlueZGattData> _dataReceivedCtrl = StreamController.broadcast();
   Stream<BlueZGattData> get dataStream => _dataReceivedCtrl.stream;
 
   Future<void> registerApplicationWithServices(List<BlueZPeripheralGattServiceDescription> serviceDescriptions,
       {Map<String, DBusValue> options = const {}}) async {
-    print("client ${_client}");
-    print("object ${_object.path}");
+    print('client ${_client}');
+    print('object ${_object.path}');
 
     DBusObjectPath appPath = _object.path;
 
@@ -65,6 +65,7 @@ class BlueZGATTManager {
       for (int p = 0; p < serviceDescription.characteristics.length; p++) {
         BlueZPeripheralGattCharacteristicDescription characteristicDescription = serviceDescription.characteristics[p];
         DBusObjectPath characteristicPath = DBusObjectPath('${servicePath.value}/char$s');
+
         BlueZPeripheralGattCharacteristic characteristic = BlueZPeripheralGattCharacteristic(
           characteristicPath,
           uuid: characteristicDescription.uuid,
@@ -73,7 +74,14 @@ class BlueZGATTManager {
           onWrite: (data) {
             _handleDataFromCharacteristic(characteristicDescription.uuid, data);
           },
+          onStartNotify: () {
+            print('StartNotify');
+          },
+          onStopNotify: () {
+            print('StopNotify');
+          },
         );
+
         characteristics.add(characteristic);
         _characteristics[characteristicDescription.uuid] = characteristic;
       }
@@ -102,6 +110,11 @@ class BlueZGATTManager {
       for (var characteristic in service.characteristics) {
         print('register characteristic ${characteristic.path.value}');
         await _client.registerObject(characteristic);
+
+        for (var descriptor in characteristic.descriptors) {
+          print('register descriptor ${descriptor.path.value}');
+          await _client.registerObject(descriptor);
+        }
       }
     }
 
@@ -122,15 +135,14 @@ class BlueZGATTManager {
     _characteristics.clear();
   }
 
-  void _handleDataFromCharacteristic(String uuid, List<int>data) {
-    print("Data from peripheral $uuid: $data");
+  void _handleDataFromCharacteristic(String uuid, List<int> data) {
     _dataReceivedCtrl.add(BlueZGattData(uuid, data));
   }
 
   void sendDataToCharacteristic(String uuid, List<int> data) {
     var characteristic = _characteristics[uuid];
     if (characteristic != null) {
-      characteristic.notify(_client.dBusClient, data);
+      characteristic.setValue(data);
     } else {
       print('Characteristic not found: $uuid');
     }

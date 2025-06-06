@@ -1,12 +1,20 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:math';
+
+import 'package:bluez/src/bluez_peripheral_gatt_descriptor.dart';
 import 'package:dbus/dbus.dart';
 
 class BlueZPeripheralGattCharacteristic extends DBusObject {
   final String uuid;
   final List<String> flags;
   final DBusObjectPath servicePath;
-
+  final List<BlueZPeripheralGattDescriptor> descriptors = [];
+  final int mtu;
   List<int> _value = [];
-  bool _notifying = false;
+  var _notifyAcquired = false;
+  var _notifying = false;
+  var _writeAcquired = false;
 
   final void Function(List<int>)? onWrite;
   final void Function()? onStartNotify;
@@ -14,15 +22,47 @@ class BlueZPeripheralGattCharacteristic extends DBusObject {
 
   List<int> get value => _value;
 
+  final _writtenDataCompleter = Completer<List<int>>();
+  Future<List<int>> get writtenData => _writtenDataCompleter.future;
+  RawSocket? notifySocket;
+
   BlueZPeripheralGattCharacteristic(
-      DBusObjectPath path, {
-        required this.uuid,
-        required this.flags,
-        required this.servicePath,
-        this.onWrite,
-        this.onStartNotify,
-        this.onStopNotify,
-      }) : super(path);
+    DBusObjectPath path, {
+    required this.uuid,
+    required this.flags,
+    required this.servicePath,
+    this.onWrite,
+    this.onStartNotify,
+    this.onStopNotify,
+    this.mtu = 0,
+  }) : super(path) {
+    final cccd = BlueZPeripheralGattDescriptor(
+      DBusObjectPath('${path.value}/desc0'),
+      uuid: '00002902-0000-1000-8000-00805f9b34fb', // 0x2902
+      characteristicPath: path,
+      onWrite: (data) {
+        print("CCCD write $data");
+        int v = data[0] | (data[1] << 8);
+        if (v == 0x0001) {
+          print('CCCD: Notifications enabled');
+          _notifying = true;
+          onStartNotify?.call();
+        } else if (v == 0x0002) {
+          print('CCCD: Indications enabled');
+          _notifying = true;
+          onStartNotify?.call();
+        } else if (v == 0x0000) {
+          print('CCCD: Notifications disabled');
+          _notifying = false;
+          onStopNotify?.call();
+        } else {
+          print('CCCD: Unknown value $data');
+        }
+      },
+    );
+
+    descriptors.add(cccd);
+  }
 
   @override
   Future<DBusMethodResponse> handleMethodCall(DBusMethodCall methodCall) async {
@@ -35,23 +75,63 @@ class BlueZPeripheralGattCharacteristic extends DBusObject {
         return DBusMethodSuccessResponse([
           DBusArray.byte(_value),
         ]);
-
       case 'WriteValue':
         final data = methodCall.values[0].asByteArray().toList();
         _value = data;
         onWrite?.call(data);
         return DBusMethodSuccessResponse();
-
+      case 'AcquireWrite':
+        if (_writeAcquired) {
+          return DBusMethodErrorResponse('org.bluez.Error.Failed');
+        }
+        await changeProperties(writeAcquired: true);
+        var address = makeRandomUnixAddress();
+        var serverSocket = await ServerSocket.bind(address, 0);
+        RawSocket? socket;
+        unawaited(serverSocket.first.then((childSocket) async {
+          _writtenDataCompleter.complete(await childSocket.first);
+          await childSocket.close();
+          await serverSocket.close();
+          await socket?.close();
+        }));
+        socket = await RawSocket.connect(address, 0);
+        var handle = ResourceHandle.fromRawSocket(socket);
+        return DBusMethodSuccessResponse([DBusUnixFd(handle), DBusUint16(mtu)]);
+      case 'AcquireNotify':
+        if (_notifyAcquired) {
+          return DBusMethodErrorResponse('org.bluez.Error.Failed');
+        }
+        await changeProperties(notifyAcquired: true);
+        var address = makeRandomUnixAddress();
+        RawSocket? socket;
+        var serverSocket = await RawServerSocket.bind(address, 0);
+        unawaited(serverSocket.first.then((childSocket) {
+          notifySocket = childSocket;
+          childSocket.listen((event) {
+            if (event == RawSocketEvent.closed) {
+              childSocket.close();
+              serverSocket.close();
+              socket?.close();
+            }
+          });
+        }));
+        socket = await RawSocket.connect(address, 0);
+        var handle = ResourceHandle.fromRawSocket(socket);
+        return DBusMethodSuccessResponse([DBusUnixFd(handle), DBusUint16(mtu)]);
       case 'StartNotify':
-        _notifying = true;
-        onStartNotify?.call();
+        if (_notifying) {
+          return DBusMethodErrorResponse('org.bluez.Error.InProgress');
+        }
+        await changeProperties(notifying: true);
         return DBusMethodSuccessResponse();
-
       case 'StopNotify':
-        _notifying = false;
-        onStopNotify?.call();
+        if (!_notifying) {
+          return DBusMethodSuccessResponse();
+        }
+        await changeProperties(notifying: false);
         return DBusMethodSuccessResponse();
-
+      case 'MTU':
+        return DBusMethodSuccessResponse([DBusUint16(mtu)]);
       default:
         return DBusMethodErrorResponse.unknownMethod();
     }
@@ -128,22 +208,35 @@ class BlueZPeripheralGattCharacteristic extends DBusObject {
     ];
   }
 
-  // Send a notification
-  Future<void> notify(DBusClient client, List<int> data) async {
-    _value = data;
-    if (!_notifying) return;
-    await client.emitSignal(
-      path: path,
-      interface: 'org.freedesktop.DBus.Properties',
-      name: 'PropertiesChanged',
-      values: [
-        DBusString('org.bluez.GattCharacteristic1'),
-        DBusDict.stringVariant({
-          'Value': DBusVariant(DBusArray.byte(_value)),
-        }),
-        DBusArray.string([]),
-      ],
-    );
+  Future<void> changeProperties({bool? notifyAcquired, bool? notifying, List<int>? value, bool? writeAcquired}) async {
+    var changedProperties = <String, DBusValue>{};
+    if (notifyAcquired != null) {
+      _notifyAcquired = notifyAcquired;
+      changedProperties['NotifyAcquired'] = DBusBoolean(notifyAcquired);
+    }
+    if (notifying != null) {
+      _notifying = notifying;
+      changedProperties['Notifying'] = DBusBoolean(notifying);
+    }
+    if (value != null) {
+      _value = value;
+      changedProperties['Value'] = DBusArray.byte(value);
+    }
+    if (writeAcquired != null) {
+      _writeAcquired = writeAcquired;
+      changedProperties['WriteAcquired'] = DBusBoolean(writeAcquired);
+    }
+    await emitPropertiesChanged('org.bluez.GattCharacteristic1', changedProperties: changedProperties);
+  }
+
+  Future<void> setValue(List<int> value) async {
+    if (_notifying) {
+      await changeProperties(value: value);
+    } else if (notifySocket != null) {
+      notifySocket!.write(value);
+    } else {
+      value = value;
+    }
   }
 
   Future<Map<String, Map<String, DBusValue>>> getDBusProperties() async {
@@ -156,5 +249,15 @@ class BlueZPeripheralGattCharacteristic extends DBusObject {
         'Notifying': DBusBoolean(_notifying),
       },
     };
+  }
+
+  InternetAddress makeRandomUnixAddress() {
+    var path = '@bluez-mortrix-';
+    var r = Random();
+    final randomChars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    for (var i = 0; i < 8; i++) {
+      path += randomChars[r.nextInt(randomChars.length)];
+    }
+    return InternetAddress(path, type: InternetAddressType.unix);
   }
 }
