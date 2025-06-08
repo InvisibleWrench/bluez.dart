@@ -130,15 +130,11 @@ class BlueZGATTManager {
       return;
     }
 
-    try {
-      await _object.callMethod(
-        'org.bluez.GattManager1',
-        'UnregisterApplication',
-        [_object.path],
-      );
-    } catch (e) {
-      print('GATT Application error: $e');
-    }
+    await _object.callMethod(
+      'org.bluez.GattManager1',
+      'UnregisterApplication',
+      [_object.path],
+    );
 
     application = null;
   }
