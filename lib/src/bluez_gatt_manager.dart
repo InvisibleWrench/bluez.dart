@@ -123,13 +123,20 @@ class BlueZGATTManager {
   }
 
   Future<void> unregisterApplication() async {
+    _characteristics.clear();
+
+    if (application == null) {
+      print('No application to unregister');
+      return;
+    }
+
     await _object.callMethod(
       'org.bluez.GattManager1',
       'UnregisterApplication',
       [_object.path],
     );
 
-    _characteristics.clear();
+    application = null;
   }
 
   void _handleDataFromCharacteristic(String uuid, List<int> data) {
