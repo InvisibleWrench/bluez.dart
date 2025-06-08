@@ -34,7 +34,7 @@ class BlueZPeripheralGattCharacteristic extends DBusObject {
     this.onWrite,
     this.onStartNotify,
     this.onStopNotify,
-    this.mtu = 23,
+    this.mtu = 0,
   }) : super(path) {
     final cccd = BlueZPeripheralGattDescriptor(
       DBusObjectPath('${path.value}/desc0'),
