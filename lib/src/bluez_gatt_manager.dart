@@ -147,8 +147,8 @@ class BlueZGATTManager {
     var characteristic = _characteristics[uuid];
     if (characteristic != null) {
       characteristic.setValue(data);
-    } else {
-      print('Characteristic not found: $uuid');
+    // } else {
+    //   print('Characteristic not found: $uuid');
     }
   }
 }
