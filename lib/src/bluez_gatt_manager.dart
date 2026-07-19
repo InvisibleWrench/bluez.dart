@@ -33,7 +33,20 @@ class BlueZGattData {
   String uuid;
   List<int> data;
 
-  BlueZGattData(this.uuid, this.data);
+  /// D-Bus object path of the central that wrote the data
+  /// (e.g. /org/bluez/hci0/dev_XX_XX_XX_XX_XX_XX), null if unknown.
+  final String? devicePath;
+
+  BlueZGattData(this.uuid, this.data, {this.devicePath});
+
+  /// MAC address of the writing central parsed from [devicePath], null if
+  /// unknown.
+  String? get deviceAddress {
+    final path = devicePath;
+    if (path == null) return null;
+    final match = RegExp(r'dev_((?:[0-9A-Fa-f]{2}_){5}[0-9A-Fa-f]{2})$').firstMatch(path);
+    return match?.group(1)?.replaceAll('_', ':');
+  }
 }
 
 class BlueZGATTManager {
@@ -68,8 +81,8 @@ class BlueZGATTManager {
           uuid: characteristicDescription.uuid,
           flags: characteristicDescription.flags,
           servicePath: servicePath,
-          onWrite: (data) {
-            _handleDataFromCharacteristic(characteristicDescription.uuid, data);
+          onWrite: (data, device) {
+            _handleDataFromCharacteristic(characteristicDescription.uuid, data, device);
           },
           onStartNotify: () {
             print('StartNotify');
@@ -139,8 +152,8 @@ class BlueZGATTManager {
     application = null;
   }
 
-  void _handleDataFromCharacteristic(String uuid, List<int> data) {
-    _dataReceivedCtrl.add(BlueZGattData(uuid, data));
+  void _handleDataFromCharacteristic(String uuid, List<int> data, String? devicePath) {
+    _dataReceivedCtrl.add(BlueZGattData(uuid, data, devicePath: devicePath));
   }
 
   void sendDataToCharacteristic(String uuid, List<int> data) {
