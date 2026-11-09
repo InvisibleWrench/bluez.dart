@@ -14,6 +14,10 @@ platforms:
 
 dependencies:
   dbus: ^0.7.11
+  # The peripheral GATT paths used to `print`. A library writing to stdout is a
+  # library whose output cannot be levelled or filtered, and on a mortrix unit
+  # stdout is the journal.
+  logging: ^1.2.0
 
 dev_dependencies:
   lints: ^2.0.0

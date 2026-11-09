@@ -1,5 +1,8 @@
 import 'package:bluez/src/bluez_peripheral_gatt_descriptor.dart';
 import 'package:dbus/dbus.dart';
+import 'package:logging/logging.dart';
+
+final _log = Logger('bluez.gatt');
 
 class BlueZPeripheralGattCharacteristic extends DBusObject {
   final String uuid;
@@ -33,22 +36,25 @@ class BlueZPeripheralGattCharacteristic extends DBusObject {
       uuid: '00002902-0000-1000-8000-00805f9b34fb', // 0x2902
       characteristicPath: path,
       onWrite: (data) {
-        print("CCCD write $data");
+        if (data.length < 2) {
+          _log.warning('CCCD write of ${data.length} byte(s) on $uuid, ignored');
+          return;
+        }
         int v = data[0] | (data[1] << 8);
         if (v == 0x0001) {
-          print('CCCD: Notifications enabled');
+          _log.fine('CCCD on $uuid: notifications enabled');
           _notifying = true;
           onStartNotify?.call();
         } else if (v == 0x0002) {
-          print('CCCD: Indications enabled');
+          _log.fine('CCCD on $uuid: indications enabled');
           _notifying = true;
           onStartNotify?.call();
         } else if (v == 0x0000) {
-          print('CCCD: Notifications disabled');
+          _log.fine('CCCD on $uuid: notifications disabled');
           _notifying = false;
           onStopNotify?.call();
         } else {
-          print('CCCD: Unknown value $data');
+          _log.warning('CCCD on $uuid: unknown value $data');
         }
       },
     );
